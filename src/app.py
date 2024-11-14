@@ -37,11 +37,6 @@ languages = {
     'Yiddish': 'yi', 'Yoruba': 'yo', 'Zulu': 'zu'
 }
 
-"""
-Initialize session state variables to manage application states:
-- `languages_selected`: To store selected language pairs.
-- `conversation_started`: To track the start or end of a conversation.
-"""
 if 'languages_selected' not in st.session_state:
     st.session_state.languages_selected = {}
 
