@@ -37,54 +37,62 @@ languages = {
     'Yiddish': 'yi', 'Yoruba': 'yo', 'Zulu': 'zu'
 }
 
-# Set session state for conversation log
+"""
+Initialize session state variables to manage application states:
+- `languages_selected`: To store selected language pairs.
+- `conversation_started`: To track the start or end of a conversation.
+"""
 if 'languages_selected' not in st.session_state:
     st.session_state.languages_selected = {}
 
-if 'conversation_log' not in st.session_state:
+if 'conversation_started' not in st.session_state:
     st.session_state.conversation_started = False
 
 
 def language_selection():
-    # Title for the page
+    """
+    Step 1: Language selection interface
+    - Allow users to select input and desired languages for both patient and healthcare provider.
+    - Save selected languages in session state for later use.
+    """
     st.title("Healthcare Translation App")
-
-    # Add dropdowns for language selection
     st.subheader("Select Languages")
 
-    # Patient's language selection
+    # Dropdown menus for language selection
     patient_lang = st.selectbox("Select speaking language for Patient", options=list(languages.keys()))
     patient_desired_lang = st.selectbox("Select output desired language for Patient", options=list(languages.keys()))
-
-    # Healthcare Provider's language selection
     healthcare_lang = st.selectbox("Select speaking language for Healthcare Provider", options=list(languages.keys()))
     healthcare_desired_lang = st.selectbox("Select output desired language for Healthcare Provider",
                                            options=list(languages.keys()))
 
-    # Proceed button
+    # Proceed button to save selections
     proceed = st.button("Proceed")
 
-    # Step 2: Store language codes based on selection
     if proceed:
-        # Save the language selection in session state
+        # Save selected language codes in session state
         st.session_state.languages_selected = {
             'patient_lang_code': languages[patient_lang],
             'patient_desired_lang_code': languages[patient_desired_lang],
             'healthcare_lang_code': languages[healthcare_lang],
             'healthcare_desired_lang_code': languages[healthcare_desired_lang]
         }
-
         st.write("Language selection complete. Proceed to start the conversation.")
-        st.session_state.conversation_started = True  # Automatically start conversation after selection
+        st.session_state.conversation_started = True
 
+        # Display selected languages for confirmation
         st.write(f"Patient Language: {patient_lang} ({languages[patient_lang]})")
         st.write(f"Patient desired Language: {patient_desired_lang} ({languages[patient_desired_lang]})")
         st.write(f"Healthcare Language: {healthcare_lang} ({languages[healthcare_lang]})")
         st.write(f"Healthcare desired Language: {healthcare_desired_lang} ({languages[healthcare_desired_lang]})")
 
 
-# Function to capture and translate speech
 def capture_and_translate(input_lang_code, output_lang_code):
+    """
+    Step 2: Capture and translate speech input
+    - Use speech recognition to capture spoken input.
+    - Translate the recognized text to the desired language.
+    - Handle errors and provide feedback.
+    """
     with sr.Microphone() as source:
         audio = recognizer.listen(source)
     try:
@@ -96,54 +104,47 @@ def capture_and_translate(input_lang_code, output_lang_code):
         return None, None
 
 
-# Function to generate and play audio for the translated text
 def play_audio(text, lang_code):
+    """
+    Step 3: Text-to-speech conversion and audio playback
+    - Generate audio for the translated text using gTTS.
+    - Return the temporary audio file for playback.
+    """
     tts = gTTS(text=text, lang=lang_code)
     tmp_audio_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
     tts.save(tmp_audio_file.name)
     return tmp_audio_file
 
 
-# Conversation interface
 def show_conversation_interface():
-    # Fetch languages from session state
+    """
+    Step 4: Conversation interface
+    - Allow patient and healthcare provider to speak, translate their inputs, and generate responses.
+    - Maintain a log of the conversation for review or download.
+    """
+    # Fetch language codes from session state
     patient_lang_code = st.session_state.languages_selected['patient_lang_code']
     healthcare_lang_code = st.session_state.languages_selected['healthcare_lang_code']
     patient_desired_lang_code = st.session_state.languages_selected['patient_desired_lang_code']
     healthcare_desired_lang_code = st.session_state.languages_selected['healthcare_desired_lang_code']
 
-    # Ensure conversation_started and conversation_log are initialized in session state
-    if 'conversation_started' not in st.session_state:
-        st.session_state.conversation_started = False
+    # Initialize conversation log if not already done
     if 'conversation_log' not in st.session_state:
         st.session_state.conversation_log = []
 
-    # Start and End buttons
+    # Start and End conversation controls
     st.markdown("<h3 style='text-align: center;'>Conversation Controls</h3>", unsafe_allow_html=True)
 
-    # Add the Start and End Conversation buttons
-
-    # Check if the 'conversation_started' key exists in session_state
-    if 'conversation_started' not in st.session_state:
-        st.session_state.conversation_started = False  # Initialize to False
-
-    # Create a button for starting conversation
     if st.button("Start Conversation"):
-        st.session_state.conversation_started = True  # Set to True when clicked
+        st.session_state.conversation_started = True
+        st.write("Conversation started. Press Speak to communicate.")
 
-        # Check the state of the conversation and display messages
-        if st.session_state.conversation_started:
-            st.write("Conversation started. Press Speak to communicate.")
-        else:
-            st.write("Click the button to start the conversation.")
-
-    # End Conversation button
     if st.button("End Conversation"):
         st.session_state.conversation_started = False
         st.write("Conversation ended. Download the conversation log below.")
 
-        # If the conversation has ended, display the log and provide a download link
-        if not st.session_state.conversation_started and st.session_state.conversation_log:
+        # Display and download conversation log if available
+        if st.session_state.conversation_log:
             conversation_log_text = "\n".join(
                 [
                     f"{entry['speaker']}:\nOriginal: {entry['original_text']}\nTranslated: {entry['translated_text']}\n"
@@ -151,27 +152,21 @@ def show_conversation_interface():
                 ]
             )
             st.text_area("Conversation Log", value=conversation_log_text, height=300)
-
-            # Create download button after "Download Log" is clicked
-            conversation_log_file = io.StringIO(conversation_log_text)
             st.download_button(
                 label="Download Conversation Log",
-                data=conversation_log_file.getvalue(),
+                data=conversation_log_text,
                 file_name="conversation_log.txt",
                 mime="text/plain"
             )
             st.session_state.conversation_log = []
-            st.session_state.conversation_started = False
 
-    # If conversation has started, show the interface
     if st.session_state.conversation_started:
-        # Columns for Patient and Healthcare Provider
+        # Interface for patient and provider communication
         col1, col2 = st.columns(2)
 
         with col1:
             st.header("Patient")
             if st.button("Speak - Patient"):
-                st.write("Listening to Patient...")
                 patient_text, patient_translated = capture_and_translate(patient_lang_code,
                                                                          healthcare_desired_lang_code)
                 if patient_text:
@@ -179,14 +174,12 @@ def show_conversation_interface():
                     st.write("Patient's Translated Text:", patient_translated)
                     st.session_state.conversation_log.append(
                         {"speaker": "Patient", "original_text": patient_text, "translated_text": patient_translated})
-                    # Generate audio for the translated text
                     patient_audio = play_audio(patient_translated, healthcare_desired_lang_code)
                     st.audio(patient_audio.name)
 
         with col2:
             st.header("Healthcare Provider")
             if st.button("Speak - Healthcare Provider"):
-                st.write("Listening to Healthcare Provider...")
                 healthcare_text, healthcare_translated = capture_and_translate(healthcare_lang_code,
                                                                                patient_desired_lang_code)
                 if healthcare_text:
@@ -195,12 +188,11 @@ def show_conversation_interface():
                     st.session_state.conversation_log.append(
                         {"speaker": "Healthcare Provider", "original_text": healthcare_text,
                          "translated_text": healthcare_translated})
-                    # Generate audio for the translated text
                     healthcare_audio = play_audio(healthcare_translated, patient_desired_lang_code)
                     st.audio(healthcare_audio.name)
 
 
-# Run language selection
+# Run the application
 language_selection()
 if st.session_state.conversation_started:
     show_conversation_interface()
